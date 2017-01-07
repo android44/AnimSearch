@@ -1,0 +1,258 @@
+package com.ndk.test;
+
+import com.ndk.test.AnimView.AnimInterface;
+import com.ndk.test.AnimView.AnimType;
+
+import android.R.color;
+import android.app.Activity;
+import android.content.Context;
+import android.os.Handler;
+import android.os.Message;
+import android.util.AttributeSet;
+import android.util.DisplayMetrics;
+import android.util.Log;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+
+public class AnimFrame extends FrameLayout implements AnimInterface{
+
+	private EditText edit;
+	private AnimView animBack;
+	private int size= 0;
+	private int width = 0;
+	public static int MIN_SIZE = 90;
+	public static float density = 0f;
+	private int max_widht = 0;
+	private AnimInterface animInterface;
+	private static int COUNT_STEP = 30; 
+	private int step = 0;
+	private AnimType type = AnimType.LEFT_TO_RIGHT;
+	private ViewGroup.LayoutParams params;
+	private boolean isAnim = false;
+	private boolean haveAnim = false;
+	Handler handler = new Handler(){
+
+		@Override
+		public void handleMessage(Message msg) {
+			// TODO Auto-generated method stub
+			super.handleMessage(msg);
+			switch (msg.what) {
+			case 1:
+				width+= step;
+				if(width+size >= max_widht){
+					animToAdd(false);
+				} else{
+					animToAdd(true);
+				}
+				break;
+			case 2:
+				width-= step;
+				if(width <= 0){
+					animFromSub(false);
+				} else{
+					animFromSub(true);
+				}
+				break;
+			default:
+				break;
+			}
+		}
+		
+	};
+	public AnimFrame(Context context,int msize) {
+		super(context);
+		// TODO Auto-generated constructor stub
+		if(msize!=0){
+			size = msize;
+		}
+		initView(context);
+	}
+	
+	public void startSearchAnim() {
+		if(animBack.getState() == AnimView.ANIM_TO_WIDTH && !isAnim){
+			animBack.startSearchAnim();
+			handler.postDelayed(new Runnable() {
+				
+				@Override
+				public void run() {
+					// TODO Auto-generated method stub
+					stopSearchAnim();
+				}
+			}, 60000*2);
+		} else if(animBack.getState() == AnimView.ANIM_TO_WIDTH && isAnim){
+			haveAnim = true;
+		} 
+	}
+
+	public void stopSearchAnim() {
+		if(animBack.isSearchRun()){
+			animBack.stopSearchAnim();
+		}
+		handler.postDelayed(new Runnable() {
+			
+			@Override
+			public void run() {
+				// TODO Auto-generated method stub
+				originaView();
+			}
+		}, 1000);
+	}
+	
+	public void setAnimInterface(AnimInterface mAnimInterface){
+		this.animInterface = mAnimInterface;
+	}
+	
+	public AnimFrame(Context context, AttributeSet attrs) {
+		super(context, attrs);
+		// TODO Auto-generated constructor stub
+		initView(context);
+	}
+	
+	public AnimFrame(Context context, AttributeSet attrs, int defStyleAttr
+			) {
+		super(context, attrs, defStyleAttr);
+		// TODO Auto-generated constructor stub
+		initView(context);
+	}
+	
+	private void initView(Context context){
+		edit = new EditText(context);
+		edit.setBackgroundColor(color.transparent);
+		animBack = new AnimView(context,this,size);
+		animBack.setHandler(handler);
+		DisplayMetrics metric = new DisplayMetrics();
+		((Activity)context).getWindowManager().getDefaultDisplay().getMetrics(metric);
+	    density = metric.density; 
+	    this.addView(animBack);
+	}
+	
+	public void setMaxWdith(int mWidth){
+		if(mWidth <=0 || mWidth<size){
+			return;
+		}
+		animBack.setMaxWidth(mWidth);
+		max_widht = mWidth;
+		step = (max_widht - size)/COUNT_STEP;
+		
+	}
+	
+	public void setAnimType(AnimType mtype){
+		if(type == mtype){
+			return;
+		}
+		FrameLayout.LayoutParams param = (LayoutParams) animBack.getLayoutParams();
+		switch (type) {
+		case LEFT_TO_RIGHT:
+			param.gravity = Gravity.LEFT;
+			break;
+		case RIGHT_TO_LEFT:
+			param.gravity = Gravity.RIGHT;
+			break;
+		case CENTER_SIDES:
+			param.gravity = Gravity.CENTER_HORIZONTAL;
+			break;
+		default:
+			break;
+		}
+		animBack.setLayoutParams(param);
+		animBack.setAnimType(mtype);
+	}
+	
+	
+	private void animToAdd(boolean next){
+		
+		if(next){
+			switch (type) {
+			case LEFT_TO_RIGHT:
+				params = this.getLayoutParams();
+				params.width = size+width;
+				this.setLayoutParams(params);
+				animBack.animStep(width);
+				break;
+			case RIGHT_TO_LEFT:
+				animBack.animStep(width);
+				break;
+			case CENTER_SIDES:
+				
+				break;
+
+			default:
+				break;
+			}
+			animRun();
+			handler.sendEmptyMessage(1);
+		} else{
+			animFinish();
+			handler.removeMessages(1);
+			int radius = size >>1;
+			FrameLayout.LayoutParams param = new FrameLayout.LayoutParams(max_widht, size);
+			edit.setPadding(radius, 0, 0, 0);
+			this.addView(edit, param);
+			startSearchAnim();
+		}
+		
+	}
+	
+	private void animFromSub(boolean next){
+		if(next){
+			params = this.getLayoutParams();
+			params.width = size+width;
+			this.setLayoutParams(params);
+			animBack.animStep(width);
+			animRun();
+			handler.sendEmptyMessage(2);
+		} else{
+			params = this.getLayoutParams();
+			params.width = size;
+			this.setLayoutParams(params);
+			animBack.animStep(0);
+			animFinish();
+			handler.removeMessages(2);
+		}
+	}
+	
+	public void originaView(){
+		if(this.getChildCount() == 2){
+			this.removeView(edit);
+			stopSearchAnim();
+			animBack.setState(AnimView.ANIM_FROM_WIDTH);
+			handler.sendEmptyMessage(2);
+		}
+	}
+	
+
+	@Override
+	public void animStart() {
+		// TODO Auto-generated method stub
+		if(animInterface != null){
+			animInterface.animStart();
+		}
+		isAnim = true;
+	}
+
+	@Override
+	public void animRun() {
+		// TODO Auto-generated method stub
+		if(animInterface != null){
+			animInterface.animRun();
+		}
+		isAnim = true;
+	}
+
+	@Override
+	public void animFinish() {
+		// TODO Auto-generated method stub
+		if(animInterface != null){
+			animInterface.animFinish();
+		}
+		isAnim = false;
+		if(haveAnim){
+			animBack.startSearchAnim();
+			haveAnim = false;
+		}
+	}
+	
+
+}
